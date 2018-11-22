@@ -1,0 +1,16 @@
+{
+  "name": "bedrock",
+  "description": "Minecraft for JavaScript",
+  "version": "0.0.1",
+  "dependencies": {},
+  "devDependencies": {
+    "rollup": "0.67.3",
+    "rollup-plugin-typescript": "1.0.0",
+    "typescript": "3.1.6",
+    "tslib": "1.9.3",
+    "three": "0.98.0"
+  },
+  "scripts": {
+    "build": "rollup -c"
+  }
+}
