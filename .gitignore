@@ -1,0 +1,5 @@
+# Others
+/node_modules
+
+# JetBrains WebStorm
+.idea
