@@ -2,9 +2,6 @@ import * as THREE from "three"
 import {IControls} from "./IControls";
 
 let controls: THREE.PointerLockControls;
-let intersected;
-let mouse: THREE.Vector2 = new THREE.Vector2();
-let raycaster2 = new THREE.Raycaster();
 
 export class MiscControls implements IControls {
     private scene: THREE.Scene;
@@ -60,23 +57,6 @@ export class MiscControls implements IControls {
 
         let cameraDirection = new THREE.Vector3();
         controls.getObject().getWorldDirection(cameraDirection);
-
-        mouse.x = window.innerWidth / 2;
-        mouse.y = window.innerHeight / 2;
-
-        raycaster2.setFromCamera(mouse, this.camera);
-        let intersections2 = raycaster2.intersectObjects(this.objects);
-
-        if (intersections2.length > 0) {
-            if (intersected != intersections2[0].object) {
-                if (intersected)
-                    intersected.material.emissive.setHex(intersected.currentHex);
-
-                intersected = intersections2[0].object;
-                intersected.currentHex = intersected.material.emissive.getHex();
-                intersected.material.emissive.setHex(0xff0000);
-            }
-        }
 
         let time = performance.now();
         let delta = (time - this.prevTime) / 1000;

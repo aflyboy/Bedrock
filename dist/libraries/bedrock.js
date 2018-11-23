@@ -5,62 +5,53 @@
 }(this, (function (exports,THREE) { 'use strict';
 
     if (typeof window === "undefined" || window === null) {
-        let instance;
-
+        importScripts("three.js/three.js");
+        var instance_1 = null;
+        var commandQueue_1 = [];
+        var kickOff_1 = function () {
+            setTimeout((function () {
+                return instance_1.run();
+            }), 0);
+            var results = [];
+            for (var i = 0; i < commandQueue_1.length; i++) {
+                var ref = commandQueue_1[i];
+                results.push(instance_1[ref[0]].apply(instance_1, ref[1]));
+            }
+            return results;
+        };
+        var executeCommand_1 = function (cmd, args) {
+            if (instance_1) {
+                if (instance_1[cmd] == null)
+                    console.error("Tried to call unexisting callback name=", cmd);
+                return instance_1[cmd].apply(instance_1, args);
+            }
+            else
+                return commandQueue_1.push([cmd, args]);
+        };
         self.addEventListener("message", function (evt) {
-            let clazz;
-
-            let data = evt.data;
+            var clazz;
+            var data = evt.data;
             if (data.method === "__ctor__") {
-                clazz = findClass(data.worker);
-                instance = (function (func, args, ctor) {
+                clazz = findClass(data.process);
+                instance_1 = (function (func, args, ctor) {
                     ctor.prototype = func.prototype;
-
-                    let c = new ctor,
-                        result = func.apply(c, args);
+                    var c = new ctor, result = func.apply(c, args);
                     return typeof result === "object" ? result : c;
-                })(clazz, data.args, function () {});
-
-                return kickOff();
-            } else if (instance) {
-                return executeCommand(data.method, data.args);
+                })(clazz, data.args, function () { });
+                return kickOff_1();
+            }
+            else if (instance_1) {
+                return executeCommand_1(data.method, data.args);
             }
         });
     }
-
-    function kickOff() {
-        setTimeout((function () {
-            return instance.run();
-        }), 0);
-
-        let results = [];
-        for (let i = 0; i < commandQueue.length; i++) {
-            let ref = commandQueue[i];
-
-            results.push(instance[ref[0]].apply(instance, ref[1]));
-        }
-
-        return results;
-    }
-
-    function executeCommand(cmd, args) {
-        if (instance) {
-            if (instance[cmd] == null)
-                console.error("Tried to call unexisting callback name=", cmd);
-            return instance[cmd].apply(instance, args);
-        } else
-            return commandQueue.push([cmd, args]);
-    }
-
     function findClass(name) {
-        let rev = self;
-
-        let ref = name.split(/\./);
-        for (let i = 0; i < ref.length; i++) {
-            let piece = ref[i];
+        var rev = self;
+        var ref = name.split(/\./);
+        for (var i = 0; i < ref.length; i++) {
+            var piece = ref[i];
             rev = rev[piece];
         }
-
         return rev;
     }
 
@@ -293,9 +284,6 @@
     }());
 
     var controls;
-    var intersected;
-    var mouse = new THREE.Vector2();
-    var raycaster2 = new THREE.Raycaster();
     var MiscControls = (function () {
         function MiscControls(scene, camera, objects) {
             this.prevTime = performance.now();
@@ -327,19 +315,6 @@
             var intersections1 = this.raycaster.intersectObjects(this.objects);
             var cameraDirection = new THREE.Vector3();
             controls.getObject().getWorldDirection(cameraDirection);
-            mouse.x = window.innerWidth / 2;
-            mouse.y = window.innerHeight / 2;
-            raycaster2.setFromCamera(mouse, this.camera);
-            var intersections2 = raycaster2.intersectObjects(this.objects);
-            if (intersections2.length > 0) {
-                if (intersected != intersections2[0].object) {
-                    if (intersected)
-                        intersected.material.emissive.setHex(intersected.currentHex);
-                    intersected = intersections2[0].object;
-                    intersected.currentHex = intersected.material.emissive.getHex();
-                    intersected.material.emissive.setHex(0xff0000);
-                }
-            }
             var time = performance.now();
             var delta = (time - this.prevTime) / 1000;
             this.velocity.x -= this.velocity.x * 10.0 * delta;
@@ -452,49 +427,93 @@
     }());
 
     var ThreadManager = (function () {
-        function ThreadManager() {
+        function ThreadManager(options) {
+            var scope = this;
             this.workers = [];
-            for (var i = 0; i < 4; i++)
-                this.initWorker();
+            this.load = {};
+            var _loop_1 = function (i) {
+                this_1.load[i] = 0;
+                this_1.workers.push(this_1.invokeWorker({
+                    process: options.process,
+                    args: options.args,
+                    onBeforeCall: function (name, args) {
+                        return scope.load[i] += 1;
+                    },
+                    onAfterCall: function (data) {
+                        scope.load[i] -= 1;
+                    }
+                }));
+            };
+            var this_1 = this;
+            for (var i = 0; i < 4; i++) {
+                _loop_1(i);
+            }
         }
-        ThreadManager.prototype.initWorker = function () {
-            return this.workers.push(this.addThread());
+        ThreadManager.prototype.getWorker = function () {
+            var scope = this;
+            var worker = (function () {
+                var ref = scope.load, results = [];
+                for (var key in ref)
+                    results.push([ref[key], key]);
+                return results;
+            }).call(this);
+            worker.sort(function (a, b) {
+                return a[0] - b[0];
+            });
+            return this.workers[worker[0][1]];
         };
-        ThreadManager.prototype.addThread = function () {
+        ThreadManager.prototype.invokeWorker = function (options) {
             var worker = new Worker("libraries/bedrock.js");
             worker.addEventListener("message", function (evt) {
                 var data = evt.data;
-                console.log("Handle thread message");
-                if (data.type == "notify")
-                    console.log("Runnable has send notify");
-                else if (data.type == "console")
-                    console.log("Runnable has send console");
+                var callback = options.onAfterCall;
+                if (data.type == "callback")
+                    if (callback != null)
+                        return callback(data.value);
             });
             worker.addEventListener("error", function (evt) {
-                console.log("Error in worker " + evt.message);
+                console.error(evt.message);
             });
             worker.postMessage({
-                worker: "Bedrock.Test",
+                process: options.process,
                 method: "__ctor__",
-                args: ["BBB"]
+                args: options.args != null ? options.args : []
             });
-            return new ThreadProxy(worker);
+            return new ThreadProxy(worker, options.process, options.onBeforeCall);
         };
         return ThreadManager;
     }());
     var ThreadProxy = (function () {
-        function ThreadProxy(worker) {
+        function ThreadProxy(worker, process, onBeforeCall) {
+            var scope = this;
+            this.worker = worker;
+            var ref = findClass(process).prototype;
+            var instance = function (key) {
+                return scope[key] = function () {
+                    var args = 1 <= arguments.length ? Array.prototype.slice.call(arguments, 0) : [];
+                    if (typeof onBeforeCall === "function")
+                        onBeforeCall(key, args);
+                    scope.worker.postMessage({ method: key, args: args });
+                };
+            };
+            for (var key in ref) {
+                if (key === "constructor" || key === "run")
+                    continue;
+                instance(key);
+            }
         }
-        ThreadProxy.i = 0;
         return ThreadProxy;
     }());
 
     var Test = (function () {
-        function Test(args) {
+        function Test(name, args) {
             console.log("Test: Thead initialize: ctor " + args);
         }
         Test.prototype.run = function () {
-            console.log("invoke run");
+            postMessage({ type: "callback", value: 0, done: this }, null, []);
+        };
+        Test.prototype.add = function () {
+            console.log("Add called.");
         };
         return Test;
     }());

@@ -1,4 +1,4 @@
-import "./process"
+import "./Process"
 
 export {Chunk} from "./base/Chunk"
 export {Block} from "./base/Block"

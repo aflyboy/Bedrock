@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Minecraft</title>
-    <script type="text/javascript" src="https://threejs.org/build/three.js"></script>
+    <script type="text/javascript" src="libraries/three.js/three.js"></script>
     <script type="text/javascript" src="libraries/three.js/libs/stats.min.js"></script>
     <script type="text/javascript" src="libraries/three.js/controls/PointerLockControls.js"></script>
     <script type="text/javascript" src="libraries/three.js/utils/BufferGeometryUtils.js"></script>
@@ -16,7 +16,7 @@
     </style>
 </head>
 <body>
-    <script type="text/javascript">
+    <script type="module">
         let scene = new THREE.Scene();
         let camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 1, 20000);
 
@@ -35,6 +35,15 @@
         for (let x = 0; x < 2; x++)
             for (let z = 0; z < 2; z++)
                 chunks[x * 2 + z] = world.generateChunk(x, z);
+
+        let tm = new Bedrock.ThreadManager({
+            process: "Bedrock.Test",
+            args: ["AAA"]
+        });
+        tm.getWorker().add();
+        tm.getWorker().add();
+        tm.getWorker().add();
+        tm.getWorker().add();
 
         let objects = game.renderRegion(chunks);
         let controls = new Bedrock.MiscControls(scene, camera, objects);
