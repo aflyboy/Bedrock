@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Minecraft</title>
     <script type="text/javascript" src="https://threejs.org/build/three.js"></script>
+    <script type="text/javascript" src="libraries/three.js/libs/stats.min.js"></script>
     <script type="text/javascript" src="libraries/three.js/controls/PointerLockControls.js"></script>
     <script type="text/javascript" src="libraries/three.js/utils/BufferGeometryUtils.js"></script>
     <script type="text/javascript" src="libraries/bedrock.js"></script>
@@ -15,10 +16,9 @@
     </style>
 </head>
 <body>
-    <!-- https://www.cnblogs.com/sincw/p/9161922.html -->
     <script type="text/javascript">
         let scene = new THREE.Scene();
-        let camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000);
+        let camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 1, 20000);
 
         let renderer = new THREE.WebGLRenderer();
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -26,10 +26,19 @@
 
         document.body.appendChild(renderer.domElement);
 
-        let game = new Bedrock.WebGLGame(scene, camera);
-        let objects = game.renderRegion();
+        let stats = new Stats();
+        document.body.append(stats.dom);
 
+        let game = new Bedrock.WebGLDirector(scene, camera);
+        let world = new Bedrock.World("AAA");
+        let chunks = [];
+        for (let x = 0; x < 2; x++)
+            for (let z = 0; z < 2; z++)
+                chunks[x * 2 + z] = world.generateChunk(x, z);
+
+        let objects = game.renderRegion(chunks);
         let controls = new Bedrock.MiscControls(scene, camera, objects);
+        game.setController(controls);
 
         window.addEventListener("resize", onWindowResize, false);
 
@@ -45,6 +54,8 @@
 
             controls.update();
             renderer.render(scene, camera);
+
+            stats.update();
         }
         animate();
     </script>

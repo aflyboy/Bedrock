@@ -9,15 +9,18 @@ export class World {
     }
 
     public generateChunk(x: number, z: number): Chunk {
-        let chunk = new Chunk();
+        let chunk = new Chunk(x, z);
         let twister = new MT32(this.seed);
         twister.extractNumber();
         for (let x = 0; x < 16; x++) {
             for (let z = 0; z < 16; z++) {
                 chunk.setBlock(x, 0, z, new Block(7)); // bedrock
-                chunk.setBlock(x, 1, z, new Block(12)); // sand
             }
         }
+        chunk.setBlock(2, 1, 2, new Block(7)); // bedrock
+        chunk.setBlock(3, 1, 2, new Block(7)); // bedrock
+        chunk.setBlock(4, 1, 2, new Block(7)); // bedrock
+        chunk.setBlock(3, 1, 3, new Block(7)); // bedrock
 
         return chunk;
     }

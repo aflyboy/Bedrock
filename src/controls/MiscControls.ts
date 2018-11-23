@@ -1,8 +1,12 @@
 import * as THREE from "three"
+import {IControls} from "./IControls";
 
 let controls: THREE.PointerLockControls;
+let intersected;
+let mouse: THREE.Vector2 = new THREE.Vector2();
+let raycaster2 = new THREE.Raycaster();
 
-export class MiscControls {
+export class MiscControls implements IControls {
     private scene: THREE.Scene;
     private camera: THREE.Camera;
     private raycaster: THREE.Raycaster;
@@ -17,8 +21,8 @@ export class MiscControls {
     private static moveBackward: boolean = false;
     private static moveLeft: boolean = false;
     private static moveRight: boolean = false;
-    private static handleJump: boolean = false;
     private static canJump: boolean = false;
+    private static yIncrement: number = 0;
 
     constructor(scene: THREE.Scene, camera: THREE.Camera, objects: []) {
         this.scene = scene;
@@ -36,16 +40,43 @@ export class MiscControls {
     }
 
     public update(): void {
-        if (MiscControls.handleJump) {
-            this.velocity.y += 500;
-            MiscControls.handleJump = false;
+        if (!controls.isLocked) {
+            MiscControls.moveForward = false;
+            MiscControls.moveLeft = false;
+            MiscControls.moveBackward = false;
+            MiscControls.moveRight = false;
         }
 
-        this.raycaster.ray.origin.copy(controls.getObject().position);
-        this.raycaster.ray.origin.y -= 10;
+        let directionY = new THREE.Vector3(0, -1, 0);
 
-        let intersections = this.raycaster.intersectObjects(this.objects);
-        let onObject = intersections.length > 0;
+        this.velocity.y += MiscControls.yIncrement;
+        MiscControls.yIncrement = 0;
+        MiscControls.canJump = false;
+
+        this.raycaster.ray.origin.copy(controls.getObject().position);
+        this.raycaster.ray.origin.y -= 25;
+
+        let intersections1 = this.raycaster.intersectObjects(this.objects);
+
+        let cameraDirection = new THREE.Vector3();
+        controls.getObject().getWorldDirection(cameraDirection);
+
+        mouse.x = window.innerWidth / 2;
+        mouse.y = window.innerHeight / 2;
+
+        raycaster2.setFromCamera(mouse, this.camera);
+        let intersections2 = raycaster2.intersectObjects(this.objects);
+
+        if (intersections2.length > 0) {
+            if (intersected != intersections2[0].object) {
+                if (intersected)
+                    intersected.material.emissive.setHex(intersected.currentHex);
+
+                intersected = intersections2[0].object;
+                intersected.currentHex = intersected.material.emissive.getHex();
+                intersected.material.emissive.setHex(0xff0000);
+            }
+        }
 
         let time = performance.now();
         let delta = (time - this.prevTime) / 1000;
@@ -53,27 +84,54 @@ export class MiscControls {
         this.velocity.x -= this.velocity.x * 10.0 * delta;
         this.velocity.z -= this.velocity.z * 10.0 * delta;
 
-        this.velocity.y -= 9.8 * 100.0 * delta;
+        this.velocity.y -= 9.8 * 50.0 * delta;
 
         this.direction.z = Number(MiscControls.moveForward) - Number(MiscControls.moveBackward);
         this.direction.x = Number(MiscControls.moveLeft) - Number(MiscControls.moveRight);
         this.direction.normalize();
 
-        if (MiscControls.moveForward || MiscControls.moveBackward) this.velocity.z -= this.direction.z * 250.0 * delta * 10;
-        if (MiscControls.moveLeft || MiscControls.moveRight) this.velocity.x -= this.direction.x * 250.0 * delta * 10;
+        let moveDirection = new THREE.Vector3();
+        if (this.direction.z > 0)
+            moveDirection.copy(cameraDirection).negate();
+        else if (this.direction.z < 0)
+            moveDirection.copy(cameraDirection).negate();
+        if (this.direction.x > 0)
+            moveDirection.copy(cameraDirection).applyAxisAngle(directionY, 90.0);
+        else if (this.direction.x < 0)
+            moveDirection.copy(cameraDirection).applyAxisAngle(directionY, -90.0);
 
-        if (onObject == true) {
+        let intersections3 = [];
+        if (this.direction.z != 0 || this.direction.x != 0) {
+            this.raycaster.ray.direction.copy(moveDirection);
+            intersections3 = this.raycaster.intersectObjects(this.objects);
+            this.raycaster.ray.direction.copy(directionY);
+        }
+
+        if (MiscControls.moveForward || MiscControls.moveBackward)
+            this.velocity.z -= this.direction.z * 250.0 * delta * 10;
+        if (MiscControls.moveLeft || MiscControls.moveRight)
+            this.velocity.x -= this.direction.x * 250.0 * delta * 10;
+
+        if (intersections1.length > 0) {
             this.velocity.y = Math.max(0, this.velocity.y);
             MiscControls.canJump = true;
+        }
+
+        if (intersections3.length > 0) {
+            if ((this.direction.x != 0))
+                this.velocity.x = 0;
+
+            if ((this.direction.z != 0))
+                this.velocity.z = 0;
         }
 
         controls.getObject().translateX(this.velocity.x * delta);
         controls.getObject().translateY(this.velocity.y * delta);
         controls.getObject().translateZ(this.velocity.z * delta);
 
-        if (controls.getObject().position.y < 10) {
+        if (controls.getObject().position.y < 25) {
             this.velocity.y = 0;
-            controls.getObject().position.y = 10;
+            controls.getObject().position.y = 25;
 
             MiscControls.canJump = true;
         }
@@ -82,6 +140,9 @@ export class MiscControls {
     }
 
     public static onDocumentKeyDown(evt): void {
+        if (!controls.isLocked)
+            return;
+
         let keyCode = evt.keyCode || evt.which;
 
         switch (keyCode) {
@@ -98,14 +159,11 @@ export class MiscControls {
                 MiscControls.moveRight = true;
                 break;
             case 32:
-                if (MiscControls.canJump) {
-                    MiscControls.handleJump = true;
-                    MiscControls.canJump = false;
-                }
+                if (MiscControls.canJump)
+                    MiscControls.yIncrement = 250;
                 break;
         }
     }
-
 
     public static onDocumentKeyUp(evt): void {
         let keyCode = evt.keyCode || evt.which;
@@ -127,6 +185,21 @@ export class MiscControls {
     }
 
     public static onDocumentClick(): void {
-        controls.lock();
+        if (!controls.isLocked) {
+            controls.lock();
+            return;
+        }
+    }
+
+    public getPlayerX(): number {
+        return controls.getObject().position.x;
+    }
+
+    public getPlayerY(): number {
+        return controls.getObject().position.y;
+    }
+
+    public getPlayerZ(): number {
+        return controls.getObject().position.z;
     }
 }

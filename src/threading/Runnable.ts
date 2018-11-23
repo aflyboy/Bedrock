@@ -1,0 +1,3 @@
+interface Runnable {
+    run(): void;
+}

@@ -1,5 +1,6 @@
 # Others
 /node_modules
+package-lock.json
 
 # JetBrains WebStorm
 .idea
